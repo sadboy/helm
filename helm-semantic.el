@@ -95,6 +95,7 @@
                   (point-at-bol) 'semantic-tag nil (point-at-eol)))) 
     (let ((tag (get-text-property (point) 'semantic-tag)))
       (semantic-go-to-tag tag)
+      (recenter)
       (unless persistent
         (pulse-momentary-highlight-one-line (point))))))
 
