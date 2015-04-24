@@ -1,6 +1,6 @@
 ;;; helm-elisp-package.el --- helm interface for package.el -*- lexical-binding: t -*-
 
-;; Copyright (C) 2012 ~ 2014 Thierry Volpiatto <thierry.volpiatto@gmail.com>
+;; Copyright (C) 2012 ~ 2015 Thierry Volpiatto <thierry.volpiatto@gmail.com>
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -45,7 +45,7 @@
   (setq helm-el-package--upgrades (helm-el-package-menu--find-upgrades))
   (if helm-force-updating-p
       (message "Refreshing packages list done")
-    (setq helm-el-package--show-only 'all))
+      (setq helm-el-package--show-only 'all))
   (kill-buffer "*Packages*"))
 
 (defun helm-el-package-describe (candidate)
@@ -247,7 +247,6 @@
 (defclass helm-list-el-package-source (helm-source-in-buffer)
   ((init :initform 'helm-el-package--init)
    (get-line :initform 'buffer-substring)
-   (match-part :initform (lambda (c) (car (split-string c))))
    (filtered-candidate-transformer :initform 'helm-el-package--transformer)
    (action-transformer
     :initform
@@ -292,6 +291,12 @@
           (helm-make-source "list packages" 'helm-list-el-package-source)))
   (helm :sources 'helm-source-list-el-package
         :buffer "*helm list packages*"))
+
+;;;###autoload
+(defun helm-list-elisp-packages-no-fetch ()
+  (interactive)
+  (let ((helm-el-package--initialized-p t))
+    (helm-list-elisp-packages nil)))
 
 (provide 'helm-elisp-package)
 

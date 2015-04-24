@@ -1,6 +1,6 @@
 ;;; helm-locate.el --- helm interface for locate. -*- lexical-binding: t -*-
 
-;; Copyright (C) 2012 ~ 2014 Thierry Volpiatto <thierry.volpiatto@gmail.com>
+;; Copyright (C) 2012 ~ 2015 Thierry Volpiatto <thierry.volpiatto@gmail.com>
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -101,6 +101,7 @@ the opposite of \"locate\" command."
     (define-key map (kbd "C-=")     'helm-ff-run-ediff-file)
     (define-key map (kbd "C-c =")   'helm-ff-run-ediff-merge-file)
     (define-key map (kbd "C-c o")   'helm-ff-run-switch-other-window)
+    (define-key map (kbd "C-c C-o") 'helm-ff-run-switch-other-frame)
     (define-key map (kbd "M-i")     'helm-ff-properties-persistent)
     (define-key map (kbd "C-c C-x") 'helm-ff-run-open-file-externally)
     (define-key map (kbd "C-c X")   'helm-ff-run-open-file-with-default-tool)
@@ -261,7 +262,7 @@ See also `helm-locate'."
                        '(" " mode-line-buffer-identification " "
                          (:eval (format "L%s" (helm-candidate-number-at-point))) " "
                          (:eval (propertize
-                                 (format "[Locate Process Finish- (%s results)]"
+                                 (format "[Locate process finished - (%s results)]"
                                          (max (1- (count-lines
                                                    (point-min) (point-max)))
                                               0))
@@ -280,6 +281,10 @@ See also `helm-locate'."
    (candidate-number-limit :initform 9999)
    (mode-line :initform helm-generic-file-mode-line-string)))
 
+(defvar helm-source-locate
+  (helm-make-source "Locate" 'helm-locate-source
+    :pattern-transformer 'helm-locate-pattern-transformer))
+
 (defun helm-locate-pattern-transformer (pattern)
   (if helm-locate-fuzzy-match
       (cond ((string-match
@@ -289,10 +294,6 @@ See also `helm-locate'."
                       (match-string 1 pattern)) " -b"))
             (t (helm--mapconcat-pattern pattern)))
       pattern))
-
-(defvar helm-source-locate
-  (helm-make-source "Locate" 'helm-locate-source
-    :pattern-transformer 'helm-locate-pattern-transformer))
 
 ;;;###autoload
 (defun helm-locate-read-file-name (prompt)

@@ -1,6 +1,6 @@
 ;;; helm-grep.el --- Helm Incremental Grep. -*- lexical-binding: t -*-
 
-;; Copyright (C) 2012 ~ 2014 Thierry Volpiatto <thierry.volpiatto@gmail.com>
+;; Copyright (C) 2012 ~ 2015 Thierry Volpiatto <thierry.volpiatto@gmail.com>
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -74,7 +74,17 @@ To enable ANSI in grep it is a little more difficult:
     1) Modify env var
       \(setenv \"GREP_COLORS\" \"ms=01;31:mc=01;31:sl=01;37:cx=:fn=35:ln=32:bn=32:se=36\")
     2) Add the option \"--color=always\".
- 
+
+To enable ANSI color in git-grep just add \"--color=always\".
+To customize the ANSI color in git-grep, GREP_COLORS have no effect,
+you will have to setup this in your .gitconfig:
+
+    [color \"grep\"]
+	match = black yellow
+
+where \"black\" is the foreground and \"yellow\" the background.
+See the git documentation for more infos.
+
 `helm-grep-default-command' and `helm-grep-default-recurse-command'are
 independents, so you can enable `helm-grep-default-command' with ack-grep
 and `helm-grep-default-recurse-command' with grep if you want to be faster
@@ -228,6 +238,10 @@ If set to nil `doc-view-mode' will be used instead of an external command."
     (define-key map (kbd "<C-up>")   'helm-grep-mode-jump-other-window-backward)
     (define-key map (kbd "<M-down>") 'helm-gm-next-file)
     (define-key map (kbd "<M-up>")   'helm-gm-precedent-file)
+    (define-key map (kbd "M-n")      'helm-grep-mode-jump-other-window-forward)
+    (define-key map (kbd "M-p")      'helm-grep-mode-jump-other-window-backward)
+    (define-key map (kbd "M-N")      'helm-gm-next-file)
+    (define-key map (kbd "M-P")      'helm-gm-precedent-file)
     map))
 
 
@@ -330,9 +344,10 @@ It is intended to use as a let-bound variable, DON'T set this globaly.")
                           (and rec-com rec-com-ack-p)))))))
 
 (defun helm-grep--prepare-cmd-line (only-files &optional include zgrep)
-  (let* ((default-directory (or helm-default-directory
+  (let* ((default-directory (or (helm-default-directory)
                                 (expand-file-name helm-ff-default-directory)))
-         (fnargs            (helm-grep-prepare-candidates only-files default-directory))
+         (fnargs            (helm-grep-prepare-candidates
+                             only-files default-directory))
          (ignored-files     (unless (helm-grep-use-ack-p)
                               (mapconcat
                                #'(lambda (x)
@@ -376,7 +391,7 @@ It is intended to use as a let-bound variable, DON'T set this globaly.")
 (defun helm-grep-init (cmd-line)
   "Start an asynchronous grep process with CMD-LINE using ZGREP if non--nil."
   (let* ((default-directory (or (expand-file-name helm-ff-default-directory)
-                                helm-default-directory))
+                                (helm-default-directory)))
          (zgrep (string-match "\\`zgrep" cmd-line))
          ;; Use pipe only with grep, zgrep or git-grep.
          (process-connection-type (and (not zgrep) (helm-grep-use-ack-p)))
@@ -695,10 +710,8 @@ Special commands:
 ;;;###autoload
 (defun helm-grep-mode-jump ()
   (interactive)
-  (let ((candidate (buffer-substring (point-at-bol) (point-at-eol))))
-    (condition-case nil
-        (progn (helm-grep-action candidate) (delete-other-windows))
-      (error nil))))
+  (helm-grep-action
+   (buffer-substring (point-at-bol) (point-at-eol))))
 
 (defun helm-grep-mode-jump-other-window-1 (arg)
   (let ((candidate (buffer-substring (point-at-bol) (point-at-eol))))
@@ -821,7 +834,7 @@ These extensions will be added to command line with --include arg of grep."
 ;;
 ;;
 (defvar helm-source-grep nil)
-(defun helm-do-grep-1 (targets &optional recurse zgrep exts)
+(defun helm-do-grep-1 (targets &optional recurse zgrep exts default-input)
   "Launch grep on a list of TARGETS files.
 When RECURSE is given use -r option of grep and prompt user
 to set the --include args of grep.
@@ -891,8 +904,8 @@ in recurse, search being made on `helm-zgrep-file-extension-regexp'."
                            (concat name "(C-c ? Help)"))
             :candidates-process 'helm-grep-collect-candidates
             :filter-one-by-one 'helm-grep-filter-one-by-one
-            :candidate-number-limit 9999
             :nohighlight t
+            :candidate-number-limit 9999
             :mode-line helm-grep-mode-line-string
             :history 'helm-grep-history
             :action (helm-make-actions
@@ -910,7 +923,7 @@ in recurse, search being made on `helm-zgrep-file-extension-regexp'."
     (helm
      :sources 'helm-source-grep
      :buffer (format "*helm %s*" (if zgrep "zgrep" (helm-grep-command recurse)))
-     :default-directory helm-ff-default-directory
+     :default default-input
      :keymap helm-grep-map
      :history 'helm-grep-history
      :truncate-lines t)))
@@ -956,6 +969,7 @@ in recurse, search being made on `helm-zgrep-file-extension-regexp'."
 (defun helm-grep--filter-candidate-1 (candidate &optional dir)
   (let* ((root   (or dir (and helm-grep-default-directory-fn
                               (funcall helm-grep-default-directory-fn))))
+         ansi-color-context ; seems this avoid non--translated fname entries.
          (ansi-p (string-match-p ansi-color-regexp candidate))
          (line   (if ansi-p (ansi-color-apply candidate) candidate))
          (split  (helm-grep-split-line line))
@@ -979,7 +993,7 @@ in recurse, search being made on `helm-zgrep-file-extension-regexp'."
   (let ((helm-grep-default-directory-fn
          (or helm-grep-default-directory-fn
              (lambda () (or helm-ff-default-directory
-                            helm-default-directory
+                            (helm-default-directory)
                             default-directory)))))
     (helm-grep--filter-candidate-1 candidate)))
 
@@ -1110,26 +1124,22 @@ If a prefix arg is given run grep on all buffers ignoring non--file-buffers."
       (kill-buffer helm-action-buffer))
     (setq helm-pdfgrep-targets only)
     (helm
-     :sources
-     `(((name . "PdfGrep")
-        (init . (lambda ()
-                  ;; If `helm-find-files' haven't already started,
-                  ;; give a default value to `helm-ff-default-directory'.
-                  (setq helm-ff-default-directory (or helm-ff-default-directory
-                                                      default-directory))))
-        (candidates-process
-         . (lambda ()
-             (funcall helm-pdfgrep-default-function helm-pdfgrep-targets)))
-        (filter-one-by-one . helm-grep-filter-one-by-one)
-        (candidate-number-limit . 9999)
-        (no-matchplugin)
-        (nohighlight)
-        (history . ,'helm-grep-history)
-        (keymap . ,helm-pdfgrep-map)
-        (mode-line . helm-pdfgrep-mode-line-string)
-        (action . helm-pdfgrep-action)
-        (persistent-help . "Jump to PDF Page")
-        (requires-pattern . 2)))
+     :sources (helm-build-async-source "PdfGrep"
+                :init (lambda ()
+                        ;; If `helm-find-files' haven't already started,
+                        ;; give a default value to `helm-ff-default-directory'.
+                        (setq helm-ff-default-directory (or helm-ff-default-directory
+                                                            default-directory)))
+                :candidates-process (lambda ()
+                                      (funcall helm-pdfgrep-default-function helm-pdfgrep-targets))
+                :filter-one-by-one #'helm-grep-filter-one-by-one
+                :candidate-number-limit 9999
+                :history 'helm-grep-history
+                :keymap helm-pdfgrep-map
+                :mode-line helm-pdfgrep-mode-line-string
+                :action #'helm-pdfgrep-action
+                :persistent-help "Jump to PDF Page"
+                :requires-pattern 2)
      :buffer "*helm pdfgrep*"
      :history 'helm-grep-history)))
 
