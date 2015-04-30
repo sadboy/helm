@@ -63,7 +63,7 @@
     (cl-dolist (tag tags)
       (when (listp tag)
         (cl-case (setq cur-type (semantic-tag-class tag))
-          ((function variable type)
+          ((function variable type start nonterminal)
            (let ((spaces (make-string (* depth 2) ?\s))
                  (type-p (eq cur-type 'type)))
              (unless (and (> depth 0) (not type-p))
