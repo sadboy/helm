@@ -223,7 +223,7 @@ arg METHOD can be one of buffer, buffer-other-window, buffer-other-frame."
   (let* ((split (helm-grep-split-line candidate))
          (buf (car split))
          (lineno (string-to-number (nth 1 split)))
-         (split-pat (helm-mp-split-pattern helm-pattern)))
+         (split-pat (helm-mp-split-pattern helm-input)))
     (cl-case method
       (buffer              (switch-to-buffer buf))
       (buffer-other-window (switch-to-buffer-other-window buf))
@@ -561,7 +561,8 @@ Special commands:
         :buffer "*helm occur*"
         :history 'helm-grep-history
         :preselect (and (memq 'helm-source-occur helm-sources-using-default-as-input)
-                        (format "%s:%d:" (buffer-name) (line-number-at-pos (point))))
+                        (format "%s:%d:" (regexp-quote (buffer-name))
+                                (line-number-at-pos (point))))
         :truncate-lines t))
 
 ;;;###autoload
