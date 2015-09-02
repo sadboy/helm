@@ -19,6 +19,7 @@
 
 (require 'cl-lib)
 (require 'helm)
+(require 'helm-help)
 (require 'helm-utils)
 
 
@@ -37,10 +38,17 @@ Don't search tag file deeply if outside this value."
   :type  'number
   :group 'helm-tags)
 
-(defcustom helm-etags-match-part-only t
-  "Whether to match only the tag part of CANDIDATE in
-helm-source-etags-select."
-  :type 'boolean
+(defcustom helm-etags-match-part-only 'tag
+  "Allow choosing the tag part of CANDIDATE in `helm-source-etags-select'.
+A tag looks like this:
+    filename: \(defun foo
+You can choose matching against only end part of tag (i.e \"foo\"),
+against only the tag part (i.e \"(defun foo\"),
+or against the whole candidate (i.e \"(filename: (defun foo\")."
+  :type '(choice
+          (const :tag "Match only tag" tag)
+          (const :tag "Match last part of tag" endtag)
+          (const :tag "Match all file+tag" all))
   :group 'helm-tags)
 
 (defcustom helm-etags-execute-action-at-once-if-one t
@@ -70,7 +78,7 @@ one match."
   "Run switch to other window action from `helm-source-etags-select'."
   (interactive)
   (with-helm-alive-p
-    (helm-quit-and-execute-action
+    (helm-exit-and-execute-action
      (lambda (c)
        (helm-etags-action-goto 'find-file-other-window c)))))
 
@@ -78,7 +86,7 @@ one match."
   "Run switch to other frame action from `helm-source-etags-select'."
   (interactive)
   (with-helm-alive-p
-    (helm-quit-and-execute-action
+    (helm-exit-and-execute-action
      (lambda (c)
        (helm-etags-action-goto 'find-file-other-frame c)))))
 
@@ -88,7 +96,6 @@ one match."
     (define-key map (kbd "M-<down>") 'helm-goto-next-file)
     (define-key map (kbd "M-<up>")   'helm-goto-precedent-file)
     (define-key map (kbd "C-w")      'helm-yank-text-at-point)
-    (define-key map (kbd "C-c ?")    'helm-etags-help)
     (define-key map (kbd "C-c o")    'helm-etags-run-switch-other-window)
     (define-key map (kbd "C-c C-o")  'helm-etags-run-switch-other-frame)
     map)
@@ -214,14 +221,12 @@ If no entry in cache, create one."
     :match-part (lambda (candidate)
                   ;; Match only the tag part of CANDIDATE
                   ;; and not the filename.
-                  (if helm-etags-match-part-only
-                      ;; Ignore the first part of the tag
-                      ;; which is irrelevant
-                      ;;(e.g in "(cl-defun foo" search only if "foo" match)
-                      (cadr (split-string
-                             (cadr (helm-etags-split-line candidate))))
-                      candidate))
-    :mode-line helm-etags-mode-line-string
+                  (cl-ecase helm-etags-match-part-only
+                      (endtag (cadr (split-string
+                                     (cadr (helm-etags-split-line candidate)))))
+                      (tag    (cadr (helm-etags-split-line candidate)))
+                      (all    candidate)))
+    :help-message 'helm-etags-help-message
     :keymap helm-etags-map
     :action '(("Go to tag" . (lambda (c)
                                (helm-etags-action-goto 'find-file c)))
