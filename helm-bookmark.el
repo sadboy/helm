@@ -224,7 +224,16 @@
 ;;; bookmark-set
 ;;
 (defvar helm-source-bookmark-set
-  (helm-build-dummy-source "Set Bookmark" :action 'bookmark-set)
+  (helm-build-dummy-source "Set Bookmark"
+    :filtered-candidate-transformer
+    (lambda (_candidates _source)
+      (list (or (and (not (string= helm-pattern ""))
+                     helm-pattern)
+                "Enter a bookmark name to record")))
+    :action '(("Set bookmark" . (lambda (candidate)
+                                  (if (string= helm-pattern "")
+                                      (message "No bookmark name given for record")
+                                      (bookmark-set candidate))))))
   "See (info \"(emacs)Bookmarks\").")
 
 
@@ -333,12 +342,10 @@ BOOKMARK is a bookmark name or a bookmark record."
 
 (defun helm-bookmark-filter-setup-alist (fn)
   "Return a filtered `bookmark-alist' sorted alphabetically."
-  (cl-loop with alist = (cl-loop for b in bookmark-alist
-                              when (funcall fn b) collect b)
-        for bmk in alist
-        for name = (car bmk)
-        collect (propertize name 'location (bookmark-location name))))
-
+  (cl-loop for b in bookmark-alist
+           for name = (car b)
+           when (funcall fn b) collect
+           (propertize name 'location (bookmark-location name))))
 
 ;;; Bookmark handlers
 ;;
@@ -475,7 +482,9 @@ than `w3m-browse-url' use it."
       :init (lambda ()
               (bookmark-maybe-load-default-file)
               (helm-init-candidates-in-buffer
-                  'global (helm-bookmark-helm-find-files-setup-alist)))))
+                  'global (helm-bookmark-helm-find-files-setup-alist)))
+      :persistent-action (lambda (_candidate) (ignore))
+      :persistent-help "Do nothing"))
 
 ;;; Uncategorized bookmarks
 ;;
@@ -690,23 +699,6 @@ words from the buffer into the new bookmark name."
   (interactive)
   (with-helm-alive-p
     (helm-exit-and-execute-action 'helm-bookmark-edit-bookmark)))
-
-
-;;; Bookmarks attributes
-;;
-(define-helm-type-attribute 'bookmark
-    `((coerce . helm-bookmark-get-bookmark-from-name)
-      (action . ,(helm-make-actions
-                  "Jump to bookmark" 'helm-bookmark-jump
-                  "Jump to BM other window" 'helm-bookmark-jump-other-window
-                  "Bookmark edit annotation" 'bookmark-edit-annotation
-                  "Bookmark show annotation" 'bookmark-show-annotation
-                  "Delete bookmark(s)" 'helm-delete-marked-bookmarks
-                  "Edit Bookmark" 'helm-bookmark-edit-bookmark
-                  "Rename bookmark" 'helm-bookmark-rename
-                  "Relocate bookmark" 'bookmark-relocate))
-      (keymap . ,helm-bookmark-map))
-  "Bookmark name.")
 
 
 (defun helm-bookmark-run-jump-other-window ()
