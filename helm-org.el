@@ -40,7 +40,8 @@ NOTE: This will be slow on large org buffers."
   :type 'boolean)
 
 (defcustom helm-org-show-filename nil
-  "Show org filename when non--nil."
+  "Show org filenames in `helm-org-agenda-files-headings' when non--nil.
+Note this have no effect in `helm-org-in-buffer-headings'."
   :group 'helm-org
   :type 'boolean)
 
@@ -72,7 +73,18 @@ NOTE: This will be slow on large org buffers."
   (switch-to-buffer (marker-buffer marker))
   (goto-char (marker-position marker))
   (org-show-context)
+  (re-search-backward "^\\*+ " nil t)
   (org-show-entry))
+
+(defcustom helm-org-headings-actions
+  '(("Go to line" . helm-org-goto-marker)
+    ("Refile to this heading" . helm-org-heading-refile)
+    ("Insert link to this heading"
+     . helm-org-insert-link-to-heading-at-marker))
+  "Default actions alist for
+  `helm-source-org-headings-for-files'."
+  :group 'helm-org
+  :type '(alist :key-type string :value-type function))
 
 (defun helm-source-org-headings-for-files (filenames &optional parents)
   (helm-build-sync-source "Org Headings"
@@ -89,10 +101,7 @@ NOTE: This will be slow on large org buffers."
     (lambda (candidates)
       (let ((cands (helm-org-get-candidates candidates parents)))
          (if parents (nreverse cands) cands)))
-    :action '(("Go to line" . helm-org-goto-marker)
-              ("Refile to this heading" . helm-org-heading-refile)
-              ("Insert link to this heading"
-               . helm-org-insert-link-to-heading-at-marker))))
+    :action 'helm-org-headings-actions))
 
 (defun helm-org-get-candidates (filenames &optional parents)
   (helm-flatten-list

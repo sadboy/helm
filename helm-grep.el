@@ -446,7 +446,7 @@ It is intended to use as a let-bound variable, DON'T set this globaly.")
                          (not (with-helm-buffer helm-grep-use-zgrep)))
                     (with-helm-buffer
                       (insert (concat "* Exit with code 1, no result found,"
-                                      " Command line was:\n\n "
+                                      " command line was:\n\n "
                                       (propertize helm-grep-last-cmd-line
                                                   'face 'helm-grep-cmd-line)))
                       (setq mode-line-format
@@ -476,10 +476,7 @@ It is intended to use as a let-bound variable, DON'T set this globaly.")
                                           (if helm-grep-in-recurse
                                               (helm-grep-command t)
                                             (helm-grep-command))))
-                                       (max (1- (count-lines
-                                                 (point-min)
-                                                 (point-max)))
-                                            0))
+                                       (helm-get-candidate-number))
                                       'face 'helm-grep-finish))))
                       (force-mode-line-update)))
                    ;; Catch error output in log.
@@ -610,6 +607,7 @@ If N is positive go forward otherwise go backward."
   (with-helm-alive-p
     (with-helm-window
       (helm-goto-next-or-prec-file -1))))
+(put 'helm-goto-precedent-file 'helm-only t)
 
 ;;;###autoload
 (defun helm-goto-next-file ()
@@ -623,24 +621,28 @@ If N is positive go forward otherwise go backward."
   (interactive)
   (with-helm-alive-p
     (helm-exit-and-execute-action 'helm-grep-action)))
+(put 'helm-grep-run-default-action 'helm-only t)
 
 (defun helm-grep-run-other-window-action ()
   "Run grep goto other window action from `helm-do-grep-1'."
   (interactive)
   (with-helm-alive-p
     (helm-exit-and-execute-action 'helm-grep-other-window)))
+(put 'helm-grep-run-other-window-action 'helm-only t)
 
 (defun helm-grep-run-other-frame-action ()
   "Run grep goto other frame action from `helm-do-grep-1'."
   (interactive)
   (with-helm-alive-p
     (helm-exit-and-execute-action 'helm-grep-other-frame)))
+(put 'helm-grep-run-other-frame-action 'helm-only t)
 
 (defun helm-grep-run-save-buffer ()
   "Run grep save results action from `helm-do-grep-1'."
   (interactive)
   (with-helm-alive-p
     (helm-exit-and-execute-action 'helm-grep-save-results)))
+(put 'helm-grep-run-save-buffer 'helm-only t)
 
 
 ;;; helm-grep-mode
@@ -678,7 +680,6 @@ If N is positive go forward otherwise go backward."
       (helm-grep-mode) (pop-to-buffer buf))
     (message "Helm Grep Results saved in `%s' buffer" buf)))
 
-;;;###autoload
 (define-derived-mode helm-grep-mode
     special-mode "helm-grep"
     "Major mode to provide actions in helm grep saved buffer.
@@ -1233,10 +1234,7 @@ You can use safely \"--color\" (default)."
                              (format
                               "[%s process finished - (%s results)] "
                               (upcase (helm-grep--ag-command))
-                              (max (1- (count-lines
-                                        (point-min)
-                                        (point-max)))
-                                   0))
+                              (helm-get-candidate-number))
                              'face 'helm-grep-finish))))
              (force-mode-line-update))))))))
 
@@ -1267,6 +1265,7 @@ You can use safely \"--color\" (default)."
                    "Find file other window" 'helm-grep-other-window)))
   (helm :sources 'helm-source-grep-ag
         :keymap helm-grep-map
+        :truncate-lines helm-grep-truncate-lines
         :buffer (format "*helm %s*" (helm-grep--ag-command))))
 
 ;;; Git grep

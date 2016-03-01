@@ -61,6 +61,11 @@ Any other non--nil value update after confirmation."
   :group 'helm-regexp
   :type '(alist :key-type string :value-type function))
 
+(defcustom helm-moccur-truncate-lines t
+  "When nil the (m)occur line that appears will not be truncated."
+  :group 'helm-regexp
+  :type 'boolean)
+
 
 (defface helm-moccur-buffer
     '((t (:foreground "DarkTurquoise" :underline t)))
@@ -283,17 +288,20 @@ Same as `helm-moccur-goto-line' but go in new frame."
   (interactive)
   (with-helm-alive-p
     (helm-exit-and-execute-action 'helm-moccur-goto-line-ow)))
+(put 'helm-moccur-run-goto-line-ow 'helm-only t)
 
 (defun helm-moccur-run-goto-line-of ()
   "Run goto line new frame action from `helm-source-moccur'."
   (interactive)
   (with-helm-alive-p
     (helm-exit-and-execute-action 'helm-moccur-goto-line-of)))
+(put 'helm-moccur-run-goto-line-of 'helm-only t)
 
 (defun helm-moccur-run-default-action ()
   (interactive)
   (with-helm-alive-p
     (helm-exit-and-execute-action 'helm-moccur-goto-line)))
+(put 'helm-moccur-run-default-action 'helm-only t)
 
 (defvar helm-source-moccur nil)
 (defclass helm-source-multi-occur (helm-source-in-buffer)
@@ -402,13 +410,14 @@ Same as `helm-moccur-goto-line' but go in new frame."
         :history 'helm-occur-history
         :keymap helm-moccur-map
         :input input
-        :truncate-lines t))
+        :truncate-lines helm-moccur-truncate-lines))
 
 (defun helm-moccur-run-save-buffer ()
   "Run moccur save results action from `helm-moccur'."
   (interactive)
   (with-helm-alive-p
     (helm-exit-and-execute-action 'helm-moccur-save-results)))
+(put 'helm-moccur-run-save-buffer 'helm-only t)
 
 
 ;;; helm-moccur-mode
@@ -572,7 +581,7 @@ Special commands:
         :preselect (and (memq 'helm-source-occur helm-sources-using-default-as-input)
                         (format "%s:%d:" (regexp-quote (buffer-name))
                                 (line-number-at-pos (point))))
-        :truncate-lines t))
+        :truncate-lines helm-moccur-truncate-lines))
 
 ;;;###autoload
 (defun helm-occur-from-isearch ()
@@ -594,7 +603,7 @@ Special commands:
           :buffer "*helm occur*"
           :history 'helm-occur-history
           :input input
-          :truncate-lines t)))
+          :truncate-lines helm-moccur-truncate-lines)))
 
 ;;;###autoload
 (defun helm-multi-occur-from-isearch (&optional _arg)
