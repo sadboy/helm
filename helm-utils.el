@@ -1,6 +1,6 @@
 ;;; helm-utils.el --- Utilities Functions for helm. -*- lexical-binding: t -*-
 
-;; Copyright (C) 2012 ~ 2015 Thierry Volpiatto <thierry.volpiatto@gmail.com>
+;; Copyright (C) 2012 ~ 2016 Thierry Volpiatto <thierry.volpiatto@gmail.com>
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -69,6 +69,16 @@ It is a float, usually 1024.0 but could be 1000.0 on some systems."
   :group 'helm-utils
   :type '(repeat (choice string)))
 
+(defcustom helm-html-decode-entities-function #'helm-html-decode-entities-string
+  "Function used to decode html entities in html bookmarks.
+Helm comes by default with `helm-html-decode-entities-string', if you need something
+more sophisticated you can use `w3m-decode-entities-string' if available.
+
+In emacs itself org-entities seems broken and `xml-substitute-numeric-entities'
+supports only numeric entities."
+  :group 'helm-utils
+  :type 'function)
+
 
 (defvar helm-goto-line-before-hook '(helm-save-current-pos-to-mark-ring)
   "Run before jumping to line.
@@ -84,6 +94,110 @@ In this case last position is added to the register
 (defvar helm-save-pos-before-jump-register ?_
   "The register where `helm-save-pos-to-register-before-jump' save position.")
 
+(defconst helm-html-entities-alist
+  '(("&quot;"   . 34)   ;; "
+    ("&gt;"     . 62)   ;; >
+    ("&lt;"     . 60)   ;; <
+    ("&amp;"    . 38)   ;; &
+    ("&euro;"   . 8364) ;; €
+    ("&Yuml;"   . 89)   ;; Y
+    ("&iexcl;"  . 161)  ;; ¡
+    ("&cent;"   . 162)  ;; ¢
+    ("&pound;"  . 163)  ;; £
+    ("&curren;" . 164)  ;; ¤
+    ("&yen"     . 165)  ;; ¥
+    ("&brvbar;" . 166)  ;; ¦
+    ("&sect;"   . 167)  ;; §
+    ("&uml;"    . 32)   ;; SPC 
+    ("&copy;"   . 169)  ;; ©
+    ("&ordf;"   . 97)   ;; a
+    ("&laquo;"  . 171)  ;; «
+    ("&not;"    . 172)  ;; ¬
+    ("&masr;"   . 174)  ;; ®
+    ("&deg;"    . 176)  ;; °
+    ("&plusmn;" . 177)  ;; ±
+    ("&sup2;"   . 50)   ;; 2
+    ("&sup3;"   . 51)   ;; 3
+    ("&acute;"  . 39)   ;; '
+    ("&micro;"  . 956)  ;; μ
+    ("&para;"   . 182)  ;; ¶
+    ("&middot;" . 183)  ;; ·
+    ("&cedil;"  . 32)   ;; SPC 
+    ("&sup1;"   . 49)   ;; 1
+    ("&ordm;"   . 111)  ;; o
+    ("&raquo;"  . 187)  ;; »
+    ("&frac14;" . 49)   ;; 1
+    ("&frac12;" . 49)   ;; 1
+    ("&frac34;" . 51)   ;; 3
+    ("&iquest;" . 191)  ;; ¿
+    ("&Agrave;" . 192)  ;; À
+    ("&Aacute;" . 193)  ;; Á
+    ("&Acirc;"  . 194)  ;; Â
+    ("&Atilde;" . 195)  ;; Ã
+    ("&Auml;"   . 196)  ;; Ä
+    ("&Aring;"  . 197)  ;; Å
+    ("&Aelig"   . 198)  ;; Æ
+    ("&Ccedil;" . 199)  ;; Ç
+    ("&Egrave;" . 200)  ;; È
+    ("&Eacute;" . 201)  ;; É
+    ("&Ecirc;"  . 202)  ;; Ê
+    ("&Euml;"   . 203)  ;; Ë
+    ("&Igrave;" . 204)  ;; Ì
+    ("&Iacute;" . 205)  ;; Í
+    ("&Icirc;"  . 206)  ;; Î
+    ("&Iuml;"   . 207)  ;; Ï
+    ("&eth;"    . 208)  ;; Ð
+    ("&Ntilde;" . 209)  ;; Ñ
+    ("&Ograve;" . 210)  ;; Ò
+    ("&Oacute;" . 211)  ;; Ó
+    ("&Ocirc;"  . 212)  ;; Ô
+    ("&Otilde;" . 213)  ;; Õ
+    ("&Ouml;"   . 214)  ;; Ö
+    ("&times;"  . 215)  ;; ×
+    ("&Oslash;" . 216)  ;; Ø
+    ("&Ugrave;" . 217)  ;; Ù
+    ("&Uacute;" . 218)  ;; Ú
+    ("&Ucirc;"  . 219)  ;; Û
+    ("&Uuml;"   . 220)  ;; Ü
+    ("&Yacute;" . 221)  ;; Ý
+    ("&thorn;"  . 222)  ;; Þ
+    ("&szlig;"  . 223)  ;; ß
+    ("&agrave;" . 224)  ;; à
+    ("&aacute;" . 225)  ;; á
+    ("&acirc;"  . 226)  ;; â
+    ("&atilde;" . 227)  ;; ã
+    ("&auml;"   . 228)  ;; ä
+    ("&aring;"  . 229)  ;; å
+    ("&aelig;"  . 230)  ;; æ
+    ("&ccedil;" . 231)  ;; ç
+    ("&egrave;" . 232)  ;; è
+    ("&eacute;" . 233)  ;; é
+    ("&ecirc;"  . 234)  ;; ê
+    ("&euml;"   . 235)  ;; ë
+    ("&igrave;" . 236)  ;; ì
+    ("&iacute;" . 237)  ;; í
+    ("&icirc;"  . 238)  ;; î
+    ("&iuml;"   . 239)  ;; ï
+    ("&eth;"    . 240)  ;; ð
+    ("&ntilde;" . 241)  ;; ñ
+    ("&ograve;" . 242)  ;; ò
+    ("&oacute;" . 243)  ;; ó
+    ("&ocirc;"  . 244)  ;; ô
+    ("&otilde;" . 245)  ;; õ
+    ("&ouml;"   . 246)  ;; ö
+    ("&divide;" . 247)  ;; ÷
+    ("&oslash;" . 248)  ;; ø
+    ("&ugrave;" . 249)  ;; ù
+    ("&uacute;" . 250)  ;; ú
+    ("&ucirc;"  . 251)  ;; û
+    ("&uuml;"   . 252)  ;; ü
+    ("&yacute;" . 253)  ;; ý
+    ("&thorn;"  . 254)  ;; þ
+    ("&yuml;"   . 255)  ;; ÿ
+    ("&reg;"    . 174)  ;; ®
+    ("&shy;"    . 173)) ;; ­
+
+  "Table of html character entities and values.")
 
 ;;; Faces.
 ;;
@@ -228,15 +342,19 @@ from its directory."
     (require 'helm-grep)
     (helm-run-after-exit
      (lambda (f)
-       (if (file-exists-p f)
-           (helm-find-files-1 (file-name-directory f)
-                              (concat
-                               "^"
-                               (regexp-quote
-                                (if helm-ff-transformer-show-only-basename
-                                    (helm-basename f) f))))
-           (helm-find-files-1 f)))
+       ;; Ensure specifics `helm-execute-action-at-once-if-one'
+       ;; fns don't run here.
+       (let (helm-execute-action-at-once-if-one)
+         (if (file-exists-p f)
+             (helm-find-files-1 (file-name-directory f)
+                                (concat
+                                 "^"
+                                 (regexp-quote
+                                  (if helm-ff-transformer-show-only-basename
+                                      (helm-basename f) f))))
+             (helm-find-files-1 f))))
      (let* ((sel       (helm-get-selection))
+            (marker    (if (consp sel) (markerp (cdr sel))))
             (grep-line (and (stringp sel)
                             (helm-grep-split-line sel)))
             (bmk-name  (and (stringp sel)
@@ -256,14 +374,18 @@ from its directory."
                        org-directory
                        (expand-file-name org-directory))
                   (with-current-buffer buf default-directory)))
+         ;; imenu (marker).
+         (marker
+          (or (buffer-file-name (marker-buffer (cdr sel)))
+              default-preselection))
          ;; Bookmark.
          (bmk (helm-aif (bookmark-get-filename bmk)
                   (if (and ffap-url-regexp
                            (string-match ffap-url-regexp it))
                       it (expand-file-name it))
                 default-directory))
-         ((or (file-remote-p sel)
-              (file-exists-p sel))
+         ((and (stringp sel) (or (file-remote-p sel)
+                                 (file-exists-p sel)))
           (expand-file-name sel))
          ;; Grep.
          ((and grep-line (file-exists-p (car grep-line)))
@@ -273,7 +395,7 @@ from its directory."
           (with-current-buffer (get-buffer (car grep-line))
             (or (buffer-file-name) default-directory)))
          ;; Url.
-         ((and ffap-url-regexp (string-match ffap-url-regexp sel)) sel)
+         ((and (stringp sel) ffap-url-regexp (string-match ffap-url-regexp sel)) sel)
          ;; Default.
          (t default-preselection))))))
 (put 'helm-quit-and-find-file 'helm-only t)
@@ -323,19 +445,15 @@ Return nil on valid file name remote or not."
   "Return a string showing SIZE of a file in human readable form.
 SIZE can be an integer or a float depending it's value.
 `file-attributes' will take care of that to avoid overflow error.
-KBSIZE if a floating point number, defaulting to `helm-default-kbsize'."
-  (let ((M (cons "M" (/ size (expt kbsize 2))))
-        (G (cons "G" (/ size (expt kbsize 3))))
-        (K (cons "K" (/ size kbsize)))
-        (B (cons "B" size)))
-    (cl-loop with result = B
-          for (a . b) in
-          (cl-loop for (x . y) in (list M G K B)
-                unless (< y 1) collect (cons x y))
-          when (< b (cdr result)) do (setq result (cons a b))
-          finally return (if (string= (car result) "B")
-                             (format "%s" size)
-                           (format "%.1f%s" (cdr result) (car result))))))
+KBSIZE is a floating point number, defaulting to `helm-default-kbsize'."
+  (cl-loop with result = (cons "B" size)
+           for i in '("k" "M" "G" "T" "P" "E" "Z" "Y")
+           while (>= (cdr result) kbsize)
+           do (setq result (cons i (/ (cdr result) kbsize)))
+           finally return
+           (pcase (car result)
+             (`"B" (format "%s" size))
+             (suffix (format "%.1f%s" (cdr result) suffix)))))
 
 (cl-defun helm-file-attributes
     (file &key type links uid gid access-time modif-time
@@ -397,34 +515,34 @@ you have in `file-attributes'."
                       :inode       inode
                       :device-num  device-num)))
          (modes (helm-split-mode-file-attributes (cl-getf all :mode))))
-    (cond (type (cl-getf all :type))
-          (links (cl-getf all :links))
-          (uid   (cl-getf all :uid))
-          (gid   (cl-getf all :gid))
+    (cond (type        (cl-getf all :type))
+          (links       (cl-getf all :links))
+          (uid         (cl-getf all :uid))
+          (gid         (cl-getf all :gid))
           (access-time (cl-getf all :access-time))
-          (modif-time (cl-getf all :modif-time))
-          (status (cl-getf all :status))
-          (size (cl-getf all :size))
-          (mode (cl-getf all :mode))
-          (gid-change (cl-getf all :gid-change))
-          (inode (cl-getf all :inode))
-          (device-num (cl-getf all :device-num))
-          (dired
-           (concat
-            (helm-split-mode-file-attributes (cl-getf all :mode) t) " "
-            (number-to-string (cl-getf all :links)) " "
-            (cl-getf all :uid) ":"
-            (cl-getf all :gid) " "
-            (if human-size
-                (helm-file-human-size (cl-getf all :size))
-              (int-to-string (cl-getf all :size))) " "
-              (cl-getf all :modif-time)))
+          (modif-time  (cl-getf all :modif-time))
+          (status      (cl-getf all :status))
+          (size        (cl-getf all :size))
+          (mode        (cl-getf all :mode))
+          (gid-change  (cl-getf all :gid-change))
+          (inode       (cl-getf all :inode))
+          (device-num  (cl-getf all :device-num))
+          (dired       (concat
+                        (helm-split-mode-file-attributes
+                         (cl-getf all :mode) t) " "
+                        (number-to-string (cl-getf all :links)) " "
+                        (cl-getf all :uid) ":"
+                        (cl-getf all :gid) " "
+                        (if human-size
+                            (helm-file-human-size (cl-getf all :size))
+                            (int-to-string (cl-getf all :size))) " "
+                        (cl-getf all :modif-time)))
           (human-size (helm-file-human-size (cl-getf all :size)))
-          (mode-type (cl-getf modes :mode-type))
+          (mode-type  (cl-getf modes :mode-type))
           (mode-owner (cl-getf modes :user))
           (mode-group (cl-getf modes :group))
           (mode-other (cl-getf modes :other))
-          (t (append all modes)))))
+          (t          (append all modes)))))
 
 (defun helm-split-mode-file-attributes (str &optional string)
   "Split mode file attributes STR into a proplist.
@@ -448,15 +566,21 @@ If STRING is non--nil return instead a space separated string."
   (declare (indent 0) (debug t))
   (helm-with-gensyms (buffer window)
     `(let* ((,buffer (temp-buffer-window-setup ,buffer-or-name))
+            (helm-always-two-windows t)
+            (helm-split-window-default-side
+             (if (eq helm-split-window-default-side 'same)
+                 'below helm-split-window-default-side))
+            helm-split-window-in-side-p
+            helm-reuse-last-window-split-state
             ,window)
+       (with-current-buffer ,buffer
+         (dired-format-columns-of-files ,candidates))
        (unwind-protect
-            (with-current-buffer ,buffer
-              (dired-format-columns-of-files ,candidates)
-              (select-window
-               (setq ,window (temp-buffer-window-show
-                              ,buffer
-                              '(display-buffer-below-selected
-                                (window-height . fit-window-to-buffer)))))
+            (with-selected-window
+                (setq ,window (temp-buffer-window-show
+                               ,buffer
+                               '(display-buffer-below-selected
+                                 (window-height . fit-window-to-buffer))))
               (progn ,@body))
          (quit-window 'kill ,window)))))
 
@@ -647,11 +771,31 @@ If COUNT is non--nil add a number after each prompt."
         (when (re-search-forward url-regexp nil t)
           (setq url (match-string 0)))
         (when (re-search-forward bmk-regexp nil t)
-          (setq title (match-string 1)))
+          (setq title (funcall helm-html-decode-entities-function
+                               (match-string 1))))
         (push (cons title url) bookmarks-alist)
         (forward-line)))
     (nreverse bookmarks-alist)))
 
+(defun helm-html-entity-to-string (entity)
+  "Replace an html ENTITY by its string value.
+When unable to decode ENTITY returns nil."
+  (helm-aif (assoc entity helm-html-entities-alist)
+      (string (cdr it))
+    (save-match-data
+      (when (string-match "[0-9]+" entity)
+        (string (string-to-number (match-string 0 entity)))))))
+
+(defun helm-html-decode-entities-string (str)
+  "Decode entities in the string STR."
+  (save-match-data
+    (with-temp-buffer
+      (insert str)
+      (goto-char (point-min))
+      (while (re-search-forward "&#?\\([^;]*\\);" nil t)
+        (helm-aif (helm-html-entity-to-string (match-string 0))
+            (replace-match it)))
+      (buffer-string))))
 
 (provide 'helm-utils)
 

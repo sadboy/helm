@@ -1,6 +1,6 @@
 ;;; helm-net.el --- helm browse url and search web. -*- lexical-binding: t -*-
 
-;; Copyright (C) 2012 ~ 2015 Thierry Volpiatto <thierry.volpiatto@gmail.com>
+;; Copyright (C) 2012 ~ 2016 Thierry Volpiatto <thierry.volpiatto@gmail.com>
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -413,12 +413,13 @@ and not be prompted to kill firefox process.
 NOTE: Probably not supported on some systems (e.g Windows)."
   (interactive (list (read-string "URL: " (browse-url-url-at-point))
                      nil))
+  (setq url (browse-url-encode-url url))
   (let ((process-environment (browse-url-process-environment)))
     (call-process-shell-command
      (format "(%s %s %s &)"
              browse-url-firefox-program
              helm-browse-url-firefox-new-window
-             url))))
+             (shell-quote-argument url)))))
 
 (defun helm-browse-url-chromium (url &optional _ignore)
   "Browse URL with google chrome browser."

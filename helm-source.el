@@ -1,6 +1,6 @@
 ;;; helm-source.el --- Helm source creation. -*- lexical-binding: t -*-
 
-;; Copyright (C) 2015  Thierry Volpiatto <thierry.volpiatto@gmail.com>
+;; Copyright (C) 2015 ~ 2016  Thierry Volpiatto <thierry.volpiatto@gmail.com>
 
 ;; Author: Thierry Volpiatto <thierry.volpiatto@gmail.com>
 ;; URL: http://github.com/emacs-helm/helm
@@ -123,16 +123,6 @@
   closed. It is useful for killing unneeded candidates buffer.
 
   Note that the function is executed BEFORE performing action.")
-
-   (delayed
-    :initarg :delayed
-    :initform nil
-    :custom (choice null integer)
-    :documentation
-    "  Candidates from the source are shown only if the user stops
-  typing and is idle for `helm-idle-delay' seconds.
-  If a value is given to delayed attr, this value is used instead only
-  if it is > to `helm-idle-delay'.")
 
    (keymap
     :initarg :keymap
@@ -491,13 +481,6 @@
   Otherwise value of `helm-follow-input-idle-delay' is used if non--nil,
   If none of these are found fallback to `helm-input-idle-delay'.")
 
-   (dont-plug
-    :initarg :dont-plug
-    :initform '(helm-compile-source--persistent-help)
-    :custom list
-    :documentation
-    "  A list of compile functions plugin to ignore.")
-
    (matchplugin
     :initarg :matchplugin
     :initform t
@@ -536,7 +519,15 @@
 
   Should be a variable.
   Can be also an anonymous function or a list of functions
-  directly added to slot, this is not recommended though."))
+  directly added to slot, this is not recommended though.")
+
+   (delayed
+    :initarg :delayed
+    :initform nil
+    :custom (choice null integer)
+    :documentation
+    "  This slot have no more effect and is just kept for backward compatibility.
+  Please don't use it."))
 
   "Main interface to define helm sources."
   :abstract t)
@@ -544,13 +535,6 @@
 (defclass helm-source-sync (helm-source)
   ((candidates
     :initform '("ERROR: You must specify the `candidates' slot, either with a list or a function"))
-
-   (dont-plug
-    :initform '(helm-compile-source--multi-match
-                helm-compile-source--persistent-help
-                ;; Ensure this will not be plugged
-                ;; if user have somewhere old helm-migemo.el.
-                helm-compile-source--migemo))
 
    (migemo
     :initarg :migemo
@@ -599,9 +583,7 @@ Matching is done basically with `string-match' against each candidate.")
   The process buffer should be nil, otherwise, if you use
   `helm-buffer' give to the process a sentinel.")
 
-   (matchplugin :initform nil)
-   (dont-plug :initform '(helm-compile-source--multi-match
-                          helm-compile-source--persistent-help)))
+   (matchplugin :initform nil))
 
   "Use this class to define a helm source calling an external process.
 The :candidates slot is not allowed even if described because this class
@@ -620,12 +602,6 @@ inherit from `helm-source'.")
   This data will be passed in a function added to the init slot and
   the buffer will be build with `helm-init-candidates-in-buffer'.
   This is an easy and fast method to build a `candidates-in-buffer' source.")
-
-   (dont-plug
-    :initform '(helm-compile-source--candidates-in-buffer
-                helm-compile-source--multi-match
-                helm-compile-source--persistent-help
-                helm-compile-source--migemo))
 
    (migemo
     :initarg :migemo
@@ -694,14 +670,15 @@ inherit from `helm-source'.")
 
   "Use this source to make helm sources storing candidates inside a buffer.
 Contrarily to `helm-source-sync' candidates are matched using a function
-like `re-search-forward', see below documentation of :search slot.")
+like `re-search-forward', see below documentation of :search slot.
+See `helm-candidates-in-buffer' for more infos.")
 
 (defclass helm-source-dummy (helm-source)
   ((candidates
     :initform '("dummy"))
 
    (filtered-candidate-transformer
-    :initform 'helm-dummy-candidate)
+    :initform (lambda (_candidates _source) (list helm-pattern)))
 
    (matchplugin
     :initform nil)
@@ -761,14 +738,14 @@ Argument CLASS is an eieio class object.
 Arguments ARGS are keyword value pairs as defined in CLASS."
   (declare (indent 2))
   (let ((source (apply #'make-instance class name args)))
-    (set-slot-value source 'name name)
+    (setf (slot-value source 'name) name)
     (helm--setup-source source)
     (helm-setup-user-source source)
     (helm--create-source source)))
 
 (defun helm-make-type (class &rest args)
   (let ((source (apply #'make-instance class args)))
-    (set-slot-value source 'name nil)
+    (setf (slot-value source 'name) nil)
     (helm--setup-source source)
     (helm--create-source source)))
 
@@ -821,14 +798,12 @@ an eieio class."
                                  actions (quote ,new-action) ,index))
                                (t actions)))))
     (if (functionp actions)
-        (set-slot-value source 'action (list (cons "Default action" actions)))
-        (set-slot-value source 'action (helm-interpret-value actions source)))
+        (setf (slot-value source 'action) (list (cons "Default action" actions)))
+        (setf (slot-value source 'action) (helm-interpret-value actions source)))
     (when (or (symbolp action-transformers) (functionp action-transformers))
       (setq action-transformers (list action-transformers)))
-    (set-slot-value
-     source
-     'action-transformer
-     (delq nil (append (list transformer) action-transformers)))))
+    (setf (slot-value source 'action-transformer)
+          (delq nil (append (list transformer) action-transformers)))))
 
 
 ;;; Methods to build sources.
@@ -873,75 +848,79 @@ an eieio class."
 (defmethod helm--setup-source :primary ((_source helm-source)))
 
 (defmethod helm--setup-source :before ((source helm-source))
+  (when (slot-value source 'delayed)
+    (warn "Deprecated usage of helm `delayed' slot in `%s'"
+          (slot-value source 'name)))
   (helm-aif (slot-value source 'keymap)
-      (and (symbolp it) (set-slot-value source 'keymap (symbol-value it))))
+      (and (symbolp it) (setf (slot-value source 'keymap) (symbol-value it))))
   (helm-aif (slot-value source 'persistent-help)
-      (set-slot-value source 'header-line
-                      (helm-source--persistent-help-string it source))
-    (set-slot-value source 'header-line (helm-source--header-line source)))
+      (setf (slot-value source 'header-line)
+            (helm-source--persistent-help-string it source))
+    (setf (slot-value source 'header-line) (helm-source--header-line source)))
   (helm-aif (slot-value source 'candidate-number-limit)
-      (and (symbolp it) (set-slot-value
-                         source 'candidate-number-limit (symbol-value it))))
+      (and (symbolp it) (setf (slot-value source 'candidate-number-limit)
+                              (symbol-value it))))
   (when (and (slot-value source 'fuzzy-match) helm-fuzzy-sort-fn)
-    (set-slot-value source 'filtered-candidate-transformer
-                    (helm-aif (slot-value source 'filtered-candidate-transformer)
-                        (append (helm-mklist it)
-                                (list helm-fuzzy-sort-fn))
-                      (list helm-fuzzy-sort-fn))))
+    (setf (slot-value source 'filtered-candidate-transformer)
+          (helm-aif (slot-value source 'filtered-candidate-transformer)
+              (append (helm-mklist it)
+                      (list helm-fuzzy-sort-fn))
+            (list helm-fuzzy-sort-fn))))
   (unless (slot-value source 'nohighlight)
-    (set-slot-value source 'filtered-candidate-transformer
-                    (helm-aif (slot-value source 'filtered-candidate-transformer)
-                        (append (helm-mklist it)
-                                (list #'helm-fuzzy-highlight-matches))
-                      (list #'helm-fuzzy-highlight-matches)))))
+    (setf (slot-value source 'filtered-candidate-transformer)
+          (helm-aif (slot-value source 'filtered-candidate-transformer)
+              (append (helm-mklist it)
+                      (list #'helm-fuzzy-highlight-matches))
+            (list #'helm-fuzzy-highlight-matches)))))
 
 (defmethod helm-setup-user-source ((_source helm-source)))
 
 (defmethod helm--setup-source ((source helm-source-sync))
   (when (slot-value source 'fuzzy-match)
     (helm-aif (slot-value source 'match)
-        (set-slot-value source 'match (append (helm-mklist it)
-                                              (list helm-fuzzy-match-fn)))
-      (set-slot-value source 'match helm-fuzzy-match-fn)))
+        (setf (slot-value source 'match)
+              (append (helm-mklist it)
+                      (list helm-fuzzy-match-fn)))
+      (setf (slot-value source 'match) helm-fuzzy-match-fn)))
   (when (slot-value source 'matchplugin)
-    (set-slot-value source 'match
-                    (helm-source-mm-get-search-or-match-fns source 'match)))
+    (setf (slot-value source 'match)
+          (helm-source-mm-get-search-or-match-fns source 'match)))
   (helm-aif (and (null (slot-value source 'matchplugin))
                  (slot-value source 'migemo))
       (unless (eq it 'nomultimatch) ; Use own migemo fn.
-        (set-slot-value source 'match
-                        (append (helm-mklist (slot-value source 'match))
-                                '(helm-mm-3-migemo-match))))))
+        (setf (slot-value source 'match)
+              (append (helm-mklist (slot-value source 'match))
+                      '(helm-mm-3-migemo-match))))))
 
 (defmethod helm--setup-source ((source helm-source-in-buffer))
   (let ((cur-init (slot-value source 'init)))
     (helm-aif (slot-value source 'data)
-        (set-slot-value
-         source
-         'init (delq
-                nil
-                (list
-                 (and (null (eq 'helm-default-init-source-in-buffer-function
-                                cur-init))
-                      cur-init)
-                 (lambda ()
-                   (helm-init-candidates-in-buffer
-                       'global
-                     (if (functionp it) (funcall it) it))))))))
+        (setf (slot-value source 'init)
+              (delq
+               nil
+               (list
+                (and (null (eq 'helm-default-init-source-in-buffer-function
+                               cur-init))
+                     cur-init)
+                (lambda ()
+                  (helm-init-candidates-in-buffer
+                      'global
+                    (if (functionp it) (funcall it) it))))))))
   (when (slot-value source 'fuzzy-match)
     (helm-aif (slot-value source 'search)
-        (set-slot-value source 'search (append (helm-mklist it)
-                                               (list helm-fuzzy-search-fn)))
-      (set-slot-value source 'search (list helm-fuzzy-search-fn))))
+        (setf (slot-value source 'search)
+              (append (helm-mklist it)
+                      (list helm-fuzzy-search-fn)))
+      (setf (slot-value source 'search) (list helm-fuzzy-search-fn))))
   (when (slot-value source 'matchplugin)
-    (set-slot-value
-     source 'search (helm-source-mm-get-search-or-match-fns source 'search)))
+    (setf (slot-value source 'search)
+          (helm-source-mm-get-search-or-match-fns source 'search)))
   (helm-aif (and (null (slot-value source 'matchplugin))
                  (slot-value source 'migemo))
       (unless (eq it 'nomultimatch)
-        (set-slot-value source 'search
-                        (append (helm-mklist (slot-value source 'search))
-                                '(helm-mm-3-migemo-search)))))
+        (setf (slot-value source 'search)
+              (append (helm-mklist (slot-value source 'search))
+                      '(helm-mm-3-migemo-search)))))
   (let ((mtc (slot-value source 'match)))
     (cl-assert (or (equal '(identity) mtc)
                    (eq 'identity mtc))

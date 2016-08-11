@@ -1,6 +1,6 @@
 ;;; helm-locate.el --- helm interface for locate. -*- lexical-binding: t -*-
 
-;; Copyright (C) 2012 ~ 2015 Thierry Volpiatto <thierry.volpiatto@gmail.com>
+;; Copyright (C) 2012 ~ 2016 Thierry Volpiatto <thierry.volpiatto@gmail.com>
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -96,6 +96,12 @@ When set, allow browsing recursively files in all
 directories of this list with `helm-projects-find-files'."
   :group 'helm-locate
   :type '(repeat string))
+
+(defcustom helm-locate-recursive-dirs-command "locate -i -e -A --regex ^%s %s.*$"
+  "Command used in recursive directories completion in `helm-find-files'.
+For Windows and `es' use something like \"es -r ^%s.*%s.*$\"."
+  :type 'string
+  :group 'helm-files)
 
 
 (defvar helm-generic-files-map
@@ -348,6 +354,30 @@ See also `helm-locate'."
              else do (funcall pfn db p)
              and collect db)))
 
+;;; Directory completion for hff.
+;;
+(defclass helm-locate-subdirs-source (helm-source-in-buffer)
+  ((basedir :initarg :basedir
+            :initform nil
+            :custom string)
+   (subdir :initarg :subdir
+           :initform nil
+           :custom 'string)
+   (data :initform #'helm-locate-init-subdirs)))
+
+(defun helm-locate-init-subdirs ()
+  (with-temp-buffer
+    (call-process-shell-command
+     (format helm-locate-recursive-dirs-command
+	     (if (string-match-p "\\`es" helm-locate-recursive-dirs-command)
+                 ;; Fix W32 paths.
+		 (replace-regexp-in-string
+                  "/" "\\\\\\\\" (helm-attr 'basedir))
+                 (helm-attr 'basedir))
+	     (helm-attr 'subdir))
+     nil t nil)
+    (buffer-string)))
+
 ;;;###autoload
 (defun helm-projects-find-files (update)
   "Find files with locate in `helm-locate-project-list'.
@@ -361,25 +391,6 @@ With a prefix arg refresh the database in each project."
     (if dbs
         (helm-locate-with-db dbs)
         (user-error "No projects found, please setup `helm-locate-project-list'"))))
-
-;;;###autoload
-(defun helm-locate-read-file-name (prompt)
-  (let* ((src `((name . "Locate read fname")
-                (init . helm-locate-set-command)
-                (candidates-process . helm-locate-init)
-                (action . identity)
-                (requires-pattern . 3)
-                (history . ,'helm-file-name-history)
-                (candidate-transformer . (helm-skip-boring-files
-                                          helm-highlight-files))
-                (candidate-number-limit . 9999)
-                (no-matchplugin))))
-    (or (helm :sources src
-              :ff-transformer-show-only-basename nil
-              :prompt prompt
-              :buffer "*helm locate read fname*"
-              :resume 'noresume)
-        (keyboard-quit))))
 
 ;;;###autoload
 (defun helm-locate (arg)

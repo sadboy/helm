@@ -1,6 +1,6 @@
 ;;; helm-man.el --- Man and woman UI -*- lexical-binding: t -*-
 
-;; Copyright (C) 2012 ~ 2015 Thierry Volpiatto <thierry.volpiatto@gmail.com>
+;; Copyright (C) 2012 ~ 2016 Thierry Volpiatto <thierry.volpiatto@gmail.com>
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -88,7 +88,7 @@ source.")
 
 (defvar helm-source-man-pages
   (helm-build-in-buffer-source "Manual Pages"
-    :init #'helm-man--init 
+    :init #'helm-man--init
     :persistent-action #'ignore
     :filtered-candidate-transformer
      (lambda (candidates _source)
@@ -102,7 +102,7 @@ With a prefix arg reinitialize the cache."
   (interactive "P")
   (when arg (setq helm-man--pages nil))
     (helm :sources 'helm-source-man-pages
-          :buffer "*Helm man woman*"))
+          :buffer "*helm man woman*"))
 
 (provide 'helm-man)
 

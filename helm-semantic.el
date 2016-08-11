@@ -1,6 +1,6 @@
 ;;; helm-semantic.el --- Helm interface for Semantic -*- lexical-binding: t -*-
 
-;; Copyright (C) 2012 ~ 2015 Daniel Hackney <dan@haxney.org>
+;; Copyright (C) 2012 ~ 2016 Daniel Hackney <dan@haxney.org>
 ;; Author: Daniel Hackney <dan@haxney.org>
 
 ;; This program is free software; you can redistribute it and/or modify
@@ -199,6 +199,7 @@ Fill in the symbol at point by default."
                      'helm-source-imenu))
          (imenu-p (eq source 'helm-source-imenu))
          (imenu-auto-rescan imenu-p)
+         (str (thing-at-point 'symbol))
          (helm-execute-action-at-once-if-one
           (and imenu-p
                helm-imenu-execute-action-at-once-if-one))
@@ -208,9 +209,8 @@ Fill in the symbol at point by default."
                 (format "\\_<%s\\_>" (car (semantic-current-tag))))))
     (helm :sources source
           :candidate-number-limit 9999
-          :preselect (if (or arg imenu-p)
-                         (thing-at-point 'symbol)
-                         tag)
+          :default (and imenu-p (list (concat "\\_<" str "\\_>") str))
+          :preselect (if (or arg imenu-p) str tag)
           :buffer "*helm semantic/imenu*")))
 
 (provide 'helm-semantic)

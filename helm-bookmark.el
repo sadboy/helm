@@ -1,6 +1,6 @@
 ;;; helm-bookmark.el --- Helm for Emacs regular Bookmarks. -*- lexical-binding: t -*-
 
-;; Copyright (C) 2012 ~ 2015 Thierry Volpiatto <thierry.volpiatto@gmail.com>
+;; Copyright (C) 2012 ~ 2016 Thierry Volpiatto <thierry.volpiatto@gmail.com>
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -30,6 +30,7 @@
 (declare-function message-buffers "message.el")
 (declare-function addressbook-set-mail-buffer-1 "ext:addressbook-bookmark.el"
                   (&optional bookmark-name append cc))
+(declare-function helm-browse-project "helm-files" (arg))
 
 
 (defgroup helm-bookmark nil
@@ -456,8 +457,42 @@ than `w3m-browse-url' use it."
   "Specialized filter function for `helm-find-files' bookmarks."
   (helm-bookmark-filter-setup-alist 'helm-bookmark-helm-find-files-p))
 
+(defun helm-bookmark-browse-project (candidate)
+  "Run `helm-browse-project' from action."
+  (with-helm-default-directory
+      (bookmark-get-filename candidate)
+      (helm-browse-project nil)))
+
+(defun helm-bookmark-run-browse-project ()
+  "Run `helm-bookmark-browse-project' from keyboard."
+  (interactive)
+  (with-helm-alive-p
+    (helm-exit-and-execute-action 'helm-bookmark-browse-project)))
+(put 'helm-bookmark-run-browse-project 'helm-only t)
+
+(defvar helm-bookmark-find-files-map
+  (let ((map (make-sparse-keymap)))
+    (set-keymap-parent map helm-bookmark-map)
+    (define-key map (kbd "C-c o")   'ignore)
+    (define-key map (kbd "C-x C-d") 'helm-bookmark-run-browse-project)
+    map))
+
+(defclass helm-bookmark-overwrite-inheritor (helm-source) ())
+
+(defmethod helm--setup-source ((source helm-bookmark-overwrite-inheritor))
+  (setf (slot-value source 'action)
+        (helm-append-at-nth
+         (remove '("Jump to BM other window" . helm-bookmark-jump-other-window)
+                 helm-type-bookmark-actions)
+         '(("Browse project" . helm-bookmark-browse-project)) 1))
+  (setf (slot-value source 'keymap) helm-bookmark-find-files-map))
+
+(defclass helm-bookmark-find-files-class (helm-source-filtered-bookmarks
+                                          helm-bookmark-overwrite-inheritor)
+  ())
+
 (defvar helm-source-bookmark-helm-find-files
-  (helm-make-source "Bookmark helm-find-files sessions" 'helm-source-filtered-bookmarks
+  (helm-make-source "Bookmark helm-find-files sessions" 'helm-bookmark-find-files-class
       :init (lambda ()
               (bookmark-maybe-load-default-file)
               (helm-init-candidates-in-buffer
@@ -494,6 +529,7 @@ than `w3m-browse-url' use it."
                                     candidate)))
                           (bookmark--jump-via bmk 'switch-to-buffer))))
    (persistent-help :initform "Show contact - Prefix with C-u to append")
+   (mode-line :initform (list "Contact(s)" helm-mode-line-string))
    (filtered-candidate-transformer :initform
                                    '(helm-adaptive-sort
                                      helm-highlight-bookmark))
@@ -523,8 +559,7 @@ than `w3m-browse-url' use it."
 ;;
 
 (defun helm-highlight-bookmark (bookmarks _source)
-  "Used as `filtered-candidate-transformer' to colorize bookmarks.
-Work both with standard Emacs bookmarks and bookmark-extensions.el."
+  "Used as `filtered-candidate-transformer' to colorize bookmarks."
   (let ((non-essential t))
     (cl-loop for i in bookmarks
           for isfile        = (bookmark-get-filename i)
@@ -683,7 +718,7 @@ words from the buffer into the new bookmark name."
   "Jump to bookmark from keyboard."
   (interactive)
   (with-helm-alive-p
-    (helm-exit-and-execute-action 'bookmark-jump-other-window)))
+    (helm-exit-and-execute-action 'helm-bookmark-jump-other-window)))
 (put 'helm-bookmark-run-jump-other-window 'helm-only t)
 
 (defun helm-bookmark-run-delete ()
