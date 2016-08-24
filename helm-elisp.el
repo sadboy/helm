@@ -304,6 +304,7 @@ Return a cons \(beg . end\)."
                       :data helm-lisp-completion--cache
                       :persistent-action 'helm-lisp-completion-persistent-action
                       :nomark t
+                      :match-part (lambda (c) (car (split-string c)))
                       :fuzzy-match helm-lisp-fuzzy-completion
                       :persistent-help (helm-lisp-completion-persistent-help)
                       :filtered-candidate-transformer
@@ -673,13 +674,13 @@ i.e the `symbol-name' of any existing symbol."
 ;;
 ;;
 (defvar helm-source-advice
-  '((name . "Function Advice")
-    (candidates . helm-advice-candidates)
-    (action ("Toggle Enable/Disable" . helm-advice-toggle))
-    (persistent-action . helm-advice-persistent-action)
-    (nomark)
-    (multiline)
-    (persistent-help . "Describe function / C-u C-j: Toggle advice")))
+  (helm-build-sync-source "Function Advice"
+    :candidates 'helm-advice-candidates
+    :action (helm-make-actions "Toggle Enable/Disable" 'helm-advice-toggle)
+    :persistent-action 'helm-advice-persistent-action
+    :nomark t
+    :multiline t
+    :persistent-help "Describe function / C-u C-j: Toggle advice"))
 
 (defun helm-advice-candidates ()
   (cl-loop for (fname) in ad-advised-functions
