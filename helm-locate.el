@@ -269,7 +269,9 @@ See also `helm-locate'."
                        (shell-quote-argument (car args)) " "
                        ;; Possible locate args added
                        ;; after pattern, don't quote them.
-                       (mapconcat 'identity (cdr args) " ")))))
+                       (mapconcat 'identity (cdr args) " "))))
+         (default-directory (if (file-directory-p default-directory)
+                                default-directory "/")))
     (helm-log "Starting helm-locate process")
     (helm-log "Command line used was:\n\n%s"
               (concat ">>> " (propertize cmd 'face 'font-lock-comment-face) "\n\n"))
@@ -402,7 +404,7 @@ Where db_path is a filename matched by
 (provide 'helm-locate)
 
 ;; Local Variables:
-;; byte-compile-warnings: (not cl-functions obsolete)
+;; byte-compile-warnings: (not obsolete)
 ;; coding: utf-8
 ;; indent-tabs-mode: nil
 ;; End:
