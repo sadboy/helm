@@ -72,7 +72,7 @@ you have completion on these functions with `C-M i' in the customize interface."
 
 (defun helm-semantic--fetch-candidates (tags depth &optional class)
   "Write the contents of TAGS to the current buffer."
-  (let ((class class) cur-type
+  (let (cur-type
         (stylefn (or (with-helm-current-buffer
                        (assoc-default major-mode helm-semantic-display-style))
                      #'semantic-format-tag-summarize)))
@@ -82,8 +82,6 @@ you have completion on these functions with `C-M i' in the customize interface."
           ((function variable type start nonterminal)
            (let ((spaces (make-string (* depth 2) ?\s))
                  (type-p (eq cur-type 'type)))
-             (unless (and (> depth 0) (not type-p))
-               (setq class nil))
              (insert
               (if (and class (not type-p))
                   (format "%s%s(%s) "
@@ -93,11 +91,11 @@ you have completion on these functions with `C-M i' in the customize interface."
               (propertize (funcall stylefn tag nil t)
                           'semantic-tag tag)
               "\n")
-             (and type-p (setq class (car tag)))
-             ;; Recurse to children
+               ;; Recurse to children
              (unless (eq cur-type 'function)
-               (helm-semantic--fetch-candidates
-                (semantic-tag-components tag) (1+ depth) class))))
+               (let ((class (if type-p (car tag) class)))
+                 (helm-semantic--fetch-candidates
+                  (semantic-tag-components tag) (1+ depth) class)))))
 
           ;; Don't do anything with packages or includes for now
           ((package include)
